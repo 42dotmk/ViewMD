@@ -965,15 +965,17 @@ static void on_open_clicked(GtkButton *button, gpointer user_data) {
 
 static void on_refresh_clicked(GtkButton *button, gpointer user_data) {
   MarkydWindow *self = (MarkydWindow *)user_data;
-  const gchar *path;
+  const gchar *current;
+  gchar *path;
 
   (void)button;
 
-  path = markyd_app_get_current_path(self->app);
-  if (!path || path[0] == '\0') {
+  current = markyd_app_get_current_path(self->app);
+  if (!current || current[0] == '\0') {
     return;
   }
 
+  path = g_strdup(current);
   if (!markyd_app_open_file(self->app, path)) {
     GtkWidget *error_dialog = gtk_message_dialog_new(
         GTK_WINDOW(self->window),
@@ -984,6 +986,7 @@ static void on_refresh_clicked(GtkButton *button, gpointer user_data) {
     gtk_dialog_run(GTK_DIALOG(error_dialog));
     gtk_widget_destroy(error_dialog);
   }
+  g_free(path);
 }
 
 static void on_settings_clicked(GtkButton *button, gpointer user_data) {
