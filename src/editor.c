@@ -382,7 +382,7 @@ static gboolean apply_markdown_idle(gpointer user_data) {
   line = self->pending_cursor_line;
   self->pending_cursor_line = -1;
   if (line >= 0)
-    scroll_to_source_line(self, line);
+    self->scroll_after_layout = line;
 
   return G_SOURCE_REMOVE;
 }
@@ -406,6 +406,7 @@ MarkydEditor *markyd_editor_new(MarkydApp *app) {
   self->updating_tags = FALSE;
   self->markdown_idle_id = 0;
   self->pending_cursor_line = -1;
+  self->scroll_after_layout = -1;
 
   self->text_view = gtk_text_view_new();
   gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(self->text_view),
@@ -441,6 +442,12 @@ static void on_text_view_size_allocate(GtkWidget *widget, GtkAllocation *allocat
   (void)widget;
   (void)allocation;
   refresh_image_widget_scales(self);
+
+  if (self->scroll_after_layout >= 0) {
+    gint line = self->scroll_after_layout;
+    self->scroll_after_layout = -1;
+    scroll_to_source_line(self, line);
+  }
 }
 
 void markyd_editor_free(MarkydEditor *self) {
