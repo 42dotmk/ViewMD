@@ -302,6 +302,7 @@ static void markyd_app_setup_socket(MarkydApp *self) {
 
   g_unix_fd_add(self->sock_fd, G_IO_IN, on_socket_accept, self);
   g_print("VIEWMD_SOCKET=%s\n", self->socket_path);
+  fflush(stdout);
 }
 
 static void markyd_app_teardown_socket(MarkydApp *self) {
