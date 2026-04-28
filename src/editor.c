@@ -356,10 +356,34 @@ static void render_table_widgets(MarkydEditor *self) {
   }
 }
 
+static void scroll_to_source_line(MarkydEditor *self, gint line) {
+  GtkTextIter iter;
+  gint n_lines;
+
+  if (!self || !self->buffer || !self->text_view || line < 0)
+    return;
+
+  n_lines = gtk_text_buffer_get_line_count(self->buffer);
+  if (line >= n_lines)
+    line = n_lines - 1;
+
+  gtk_text_buffer_get_iter_at_line(self->buffer, &iter, line);
+  gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(self->text_view), &iter,
+                               0.0, TRUE, 0.0, 0.3);
+}
+
 static gboolean apply_markdown_idle(gpointer user_data) {
   MarkydEditor *self = (MarkydEditor *)user_data;
+  gint line;
+
   self->markdown_idle_id = 0;
   apply_markdown(self);
+
+  line = self->pending_cursor_line;
+  self->pending_cursor_line = -1;
+  if (line >= 0)
+    scroll_to_source_line(self, line);
+
   return G_SOURCE_REMOVE;
 }
 
@@ -381,6 +405,7 @@ MarkydEditor *markyd_editor_new(MarkydApp *app) {
   self->source_content = g_strdup("");
   self->updating_tags = FALSE;
   self->markdown_idle_id = 0;
+  self->pending_cursor_line = -1;
 
   self->text_view = gtk_text_view_new();
   gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(self->text_view),

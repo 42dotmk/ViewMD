@@ -18,6 +18,10 @@ typedef struct _MarkydEditor {
 
   /* Coalesce markdown re-rendering to idle to avoid invalidating GTK iterators. */
   guint markdown_idle_id;
+
+  /* Source line to scroll to after next render; -1 = no pending scroll. */
+  gint pending_cursor_line;
+
 } MarkydEditor;
 
 /* Lifecycle */
