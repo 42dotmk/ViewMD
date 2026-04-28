@@ -356,20 +356,74 @@ static void render_table_widgets(MarkydEditor *self) {
   }
 }
 
+static gboolean scroll_debug_enabled(void) {
+  const gchar *v = g_getenv("VIEWMD_DEBUG_SCROLL");
+  return v && v[0] != '\0' && g_strcmp0(v, "0") != 0;
+}
+
 static void scroll_to_source_line(MarkydEditor *self, gint line) {
-  GtkTextIter iter;
-  gint n_lines;
+  GtkWidget *sw;
+  GtkAdjustment *vadj;
+  gdouble upper, page_size, fraction, target;
+  gint n_source_lines = 1;
+  const gchar *p;
+  gboolean dbg = scroll_debug_enabled();
 
-  if (!self || !self->buffer || !self->text_view || line < 0)
+  if (!self || !self->text_view || line < 0) {
+    if (dbg) g_printerr("scroll: bail (self=%p text_view=%p line=%d)\n",
+                        (void*)self, self ? (void*)self->text_view : NULL, line);
     return;
+  }
 
-  n_lines = gtk_text_buffer_get_line_count(self->buffer);
-  if (line >= n_lines)
-    line = n_lines - 1;
+  for (p = self->source_content; p && *p; p++)
+    if (*p == '\n') n_source_lines++;
 
-  gtk_text_buffer_get_iter_at_line(self->buffer, &iter, line);
-  gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(self->text_view), &iter,
-                               0.0, TRUE, 0.0, 0.3);
+  sw = gtk_widget_get_ancestor(self->text_view, GTK_TYPE_SCROLLED_WINDOW);
+  if (!sw) {
+    if (dbg) g_printerr("scroll: no scrolled window ancestor\n");
+    return;
+  }
+
+  vadj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(sw));
+  if (!vadj) {
+    if (dbg) g_printerr("scroll: no vadjustment\n");
+    return;
+  }
+
+  upper = gtk_adjustment_get_upper(vadj);
+  page_size = gtk_adjustment_get_page_size(vadj);
+
+  if (dbg)
+    g_printerr("scroll: line=%d n_lines=%d upper=%.1f page=%.1f\n",
+               line, n_source_lines, upper, page_size);
+
+  if (upper <= page_size) {
+    if (dbg) g_printerr("scroll: content fits, no scroll needed\n");
+    return;
+  }
+
+  fraction = (n_source_lines > 1)
+    ? (gdouble)line / (gdouble)(n_source_lines - 1)
+    : 0.0;
+  target = fraction * (upper - page_size);
+  target = CLAMP(target, 0.0, upper - page_size);
+
+  if (dbg)
+    g_printerr("scroll: fraction=%.3f target=%.1f\n", fraction, target);
+
+  gtk_adjustment_set_value(vadj, target);
+
+  if (dbg)
+    g_printerr("scroll: after set, value=%.1f\n", gtk_adjustment_get_value(vadj));
+}
+
+static gboolean scroll_after_apply_idle(gpointer user_data) {
+  MarkydEditor *self = (MarkydEditor *)user_data;
+  gint line = self->scroll_after_layout;
+  self->scroll_after_layout = -1;
+  if (line >= 0)
+    scroll_to_source_line(self, line);
+  return G_SOURCE_REMOVE;
 }
 
 static gboolean apply_markdown_idle(gpointer user_data) {
@@ -381,8 +435,10 @@ static gboolean apply_markdown_idle(gpointer user_data) {
 
   line = self->pending_cursor_line;
   self->pending_cursor_line = -1;
-  if (line >= 0)
+  if (line >= 0) {
     self->scroll_after_layout = line;
+    g_timeout_add(50, scroll_after_apply_idle, self);
+  }
 
   return G_SOURCE_REMOVE;
 }
@@ -442,12 +498,6 @@ static void on_text_view_size_allocate(GtkWidget *widget, GtkAllocation *allocat
   (void)widget;
   (void)allocation;
   refresh_image_widget_scales(self);
-
-  if (self->scroll_after_layout >= 0) {
-    gint line = self->scroll_after_layout;
-    self->scroll_after_layout = -1;
-    scroll_to_source_line(self, line);
-  }
 }
 
 void markyd_editor_free(MarkydEditor *self) {

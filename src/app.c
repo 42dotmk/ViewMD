@@ -270,6 +270,12 @@ static gboolean on_socket_accept(gint fd, GIOCondition cond, gpointer user_data)
         raw = nl + 1;
       }
     }
+    {
+      const gchar *dbg = g_getenv("VIEWMD_DEBUG_SCROLL");
+      if (dbg && dbg[0] != '\0' && g_strcmp0(dbg, "0") != 0)
+        g_printerr("socket: cursor_line=%d content_len=%zu\n",
+                   cursor_line, strlen(raw));
+    }
     self->editor->pending_cursor_line = cursor_line;
     markyd_editor_set_content(self->editor, raw);
   }
